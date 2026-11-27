@@ -1,0 +1,371 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Portable types only (String, Int, Float, Boolean, DateTime) so this schema
+// can move to PostgreSQL by changing `provider` to "postgresql".
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  passwordHash  String
+  roleId        String
+  role          Role     @relation(fields: [roleId], references: [id])
+  allWarehouses Boolean  @default(false)
+  active        Boolean  @default(true)
+  phone         String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  warehouses         UserWarehouse[]
+  ledCrews           Crew[]                  @relation("CrewLead")
+  crewMembers        CrewMember[]
+  sessions           Session[]
+  transactions       InventoryTransaction[]
+  auditEvents        AuditEvent[]
+  managedWarehouses  Warehouse[]             @relation("LocationManager")
+  stockCounts        StockCount[]
+}
+
+model Role {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String  @default("")
+  isSystem    Boolean @default(false)
+  /// JSON map of section key -> "none" | "view" | "edit"
+  permissions String
+  users       User[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model UserWarehouse {
+  userId      String
+  warehouseId String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@id([userId, warehouseId])
+}
+
+model Crew {
+  id      String       @id @default(cuid())
+  name    String
+  leadId  String?
+  lead    User?        @relation("CrewLead", fields: [leadId], references: [id])
+  active  Boolean      @default(true)
+  members CrewMember[]
+  jobs    Job[]
+}
+
+model CrewMember {
+  crewId String
+  userId String
+  crew   Crew   @relation(fields: [crewId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([crewId, userId])
+}
+
+model Warehouse {
+  id                String  @id @default(cuid())
+  name              String  @unique
+  address1          String
+  address2          String  @default("")
+  city              String
+  state             String
+  postalCode        String
+  locationManagerId String?
+  locationManager   User?   @relation("LocationManager", fields: [locationManagerId], references: [id])
+  active            Boolean @default(true)
+  notes             String  @default("")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  users        UserWarehouse[]
+  jobs         Job[]
+  balances     StockBalance[]
+  containers   InventoryContainer[]
+  transactions InventoryTransaction[]
+  stockCounts  StockCount[]
+  matches      WarehouseMatch[]
+  poLines      PurchaseOrderLine[]
+}
+
+model Product {
+  id                  String   @id @default(cuid())
+  name                String
+  nameKey             String   @unique
+  category            String
+  componentKey        String?
+  pricePerLb          Float
+  priceIsPlaceholder  Boolean  @default(false)
+  weightPerBox        Float?
+  status              String   @default("ACTIVE")
+  vendorName          String   @default("")
+  vendorEmail         String   @default("")
+  reorderPointLbs     Float    @default(0)
+  orderUpToLbs        Float    @default(0)
+  notes               String   @default("")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  balances     StockBalance[]
+  containers   InventoryContainer[]
+  jobLines     JobMaterial[]
+  transactions InventoryTransaction[]
+  pickLines    JobPickLine[]
+  colorMaps    ColorMap[]
+  poLines      PurchaseOrderLine[]
+  stockCounts  StockCount[]
+}
+
+model StockBalance {
+  id          String    @id @default(cuid())
+  warehouseId String
+  productId   String
+  onHandLbs   Float     @default(0)
+  shelfMinLbs Float     @default(0)
+  updatedAt   DateTime  @updatedAt
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  product     Product   @relation(fields: [productId], references: [id])
+
+  @@unique([warehouseId, productId])
+}
+
+model InventoryContainer {
+  id           String    @id @default(cuid())
+  barcode      String    @unique
+  productId    String
+  warehouseId  String
+  remainingLbs Float
+  capacityLbs  Float
+  drawnLbs     Float     @default(0)
+  status       String
+  jobId        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  product      Product   @relation(fields: [productId], references: [id])
+  warehouse    Warehouse @relation(fields: [warehouseId], references: [id])
+  job          Job?      @relation(fields: [jobId], references: [id])
+}
+
+model Job {
+  id                     String    @id @default(cuid())
+  jobNumber              String    @unique
+  builderPrimeProjectId  String?
+  type                   String    @default("STANDARD")
+  status                 String    @default("NEW")
+  builderPrimeStatus     String    @default("")
+  address1               String    @default("")
+  address2               String    @default("")
+  city                   String    @default("")
+  state                  String    @default("")
+  postalCode             String    @default("")
+  salesperson            String    @default("")
+  foreman                String    @default("")
+  warehouseId            String?
+  crewId                 String?
+  scheduledDate          String?
+  installedDate          String?
+  squareFootage          Float?
+  verticalLf             Float     @default(0)
+  stairsLf               Float     @default(0)
+  flakeColor             String    @default("")
+  flakeSize              String    @default("1/4")
+  season                 String    @default("summer")
+  includeMoisture        Boolean   @default(false)
+  includeGator           Boolean   @default(false)
+  includeBaseCd          Boolean   @default(false)
+  includeTopCd           Boolean   @default(false)
+  companyCamUrl          String    @default("")
+  notes                  String    @default("")
+  source                 String    @default("MANUAL")
+  searchText             String    @default("")
+  firstCheckoutAt        DateTime?
+  archivedAt             DateTime?
+  deletedAt              DateTime?
+  bpSyncedAt             DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  warehouse    Warehouse?             @relation(fields: [warehouseId], references: [id])
+  crew         Crew?                  @relation(fields: [crewId], references: [id])
+  materials    JobMaterial[]
+  pickLines    JobPickLine[]
+  transactions InventoryTransaction[]
+  containers   InventoryContainer[]
+
+  @@index([status])
+  @@index([warehouseId])
+  @@index([scheduledDate])
+  @@index([deletedAt])
+  @@index([builderPrimeProjectId])
+}
+
+model JobMaterial {
+  id            String   @id @default(cuid())
+  jobId         String
+  productId     String
+  lbsCheckedOut Float    @default(0)
+  lbsCheckedIn  Float    @default(0)
+  updatedAt     DateTime @updatedAt
+  job           Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  product       Product  @relation(fields: [productId], references: [id])
+
+  @@unique([jobId, productId])
+}
+
+model JobPickLine {
+  id           String  @id @default(cuid())
+  jobId        String
+  componentKey String
+  productId    String?
+  plannedLbs   Float
+  job          Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  product      Product? @relation(fields: [productId], references: [id])
+
+  @@unique([jobId, componentKey])
+}
+
+model InventoryTransaction {
+  id           String    @id @default(cuid())
+  occurredAt   DateTime  @default(now())
+  barcode      String    @default("")
+  productId    String
+  event        String
+  weightChange Float
+  newBalance   Float
+  warehouseId  String
+  jobId        String?
+  userId       String?
+  note         String    @default("")
+  product      Product   @relation(fields: [productId], references: [id])
+  warehouse    Warehouse @relation(fields: [warehouseId], references: [id])
+  job          Job?      @relation(fields: [jobId], references: [id])
+  user         User?     @relation(fields: [userId], references: [id])
+
+  @@index([occurredAt])
+  @@index([jobId])
+  @@index([warehouseId])
+  @@index([productId])
+}
+
+model StockCount {
+  id          String    @id @default(cuid())
+  warehouseId String
+  productId   String
+  systemLbs   Float
+  countedLbs  Float
+  userId      String?
+  createdAt   DateTime  @default(now())
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  product     Product   @relation(fields: [productId], references: [id])
+  user        User?     @relation(fields: [userId], references: [id])
+}
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  occurredAt DateTime @default(now())
+  userId     String?
+  userName   String   @default("")
+  action     String
+  entityType String
+  entityId   String   @default("")
+  summary    String
+  beforeJson String   @default("")
+  afterJson  String   @default("")
+  user       User?    @relation(fields: [userId], references: [id])
+
+  @@index([occurredAt])
+  @@index([entityType])
+}
+
+model WorkspaceConfig {
+  id                    String   @id @default("workspace")
+  companyName           String   @default("Endless Poxybilities")
+  timezone              String   @default("America/Chicago")
+  coverageJson          String
+  componentMapJson      String
+  bpSubdomain           String   @default("endlesspoxybilities")
+  bpMode                String   @default("mock")
+  bpImportStatuses      String   @default("Sold,Job Sold,Contract Signed")
+  bpFieldMapJson        String
+  bpStatusMapJson       String
+  varianceTolerancePct  Float    @default(5)
+  winterMonths          String   @default("11,12,1,2,3")
+  updatedAt             DateTime @updatedAt
+}
+
+model ColorMap {
+  id          String  @id @default(cuid())
+  bpColorName String  @unique
+  productId   String
+  product     Product @relation(fields: [productId], references: [id])
+}
+
+model WarehouseMatch {
+  id          String    @id @default(cuid())
+  bpLocation  String    @unique
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+}
+
+model SyncLog {
+  id           String    @id @default(cuid())
+  startedAt    DateTime  @default(now())
+  finishedAt   DateTime?
+  trigger      String
+  mode         String
+  status       String
+  createdCount Int       @default(0)
+  updatedCount Int       @default(0)
+  skippedCount Int       @default(0)
+  message      String    @default("")
+  detail       String    @default("")
+}
+
+model PurchaseOrder {
+  id          String              @id @default(cuid())
+  number      String              @unique
+  vendorName  String
+  vendorEmail String              @default("")
+  status      String              @default("DRAFT")
+  notes       String              @default("")
+  createdAt   DateTime            @default(now())
+  lines       PurchaseOrderLine[]
+}
+
+model PurchaseOrderLine {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  productId       String
+  warehouseId     String?
+  lbs             Float
+  unitPrice       Float
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product         Product       @relation(fields: [productId], references: [id])
+  warehouse       Warehouse?    @relation(fields: [warehouseId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  kind      String
+  toAddress String   @default("")
+  subject   String
+  body      String
+  status    String
+  createdAt DateTime @default(now())
+}
