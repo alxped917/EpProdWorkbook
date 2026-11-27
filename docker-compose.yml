@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: workbook
+      POSTGRES_PASSWORD: workbook
+      POSTGRES_DB: workbook
+    ports:
+      - "5432:5432"
+    volumes:
+      - workbook_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workbook -d workbook"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  workbook_pg:

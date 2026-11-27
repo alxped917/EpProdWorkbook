@@ -1,12 +1,50 @@
 import "server-only";
-import { createHash, randomBytes, timingSafeEqual } from "crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "./db";
 import { can, normalizePermissions, type PermLevel, type PermissionMap, type SectionKey } from "./permissions";
+import { authSecretError } from "./seed-plan";
 
-export const SESSION_COOKIE = "ep_session";
+export function sessionCookieName(): string {
+  return process.env.NODE_ENV === "production" ? "__Host-ep_session" : "ep_session";
+}
+
 const SESSION_DAYS = 14;
+
+export function requireAuthSecret(): string {
+  const error = authSecretError(process.env);
+  if (error) throw new Error(error);
+  return process.env.AUTH_SECRET!.trim();
+}
+
+export function sealSession(token: string): string {
+  const sig = createHmac("sha256", requireAuthSecret()).update(token).digest("base64url");
+  return `${token}.${sig}`;
+}
+
+export function openSession(sealed: string): string | null {
+  const secret = process.env.AUTH_SECRET?.trim();
+  if (!secret || authSecretError(process.env)) return null;
+  const dot = sealed.lastIndexOf(".");
+  if (dot <= 0) return null;
+  const token = sealed.slice(0, dot);
+  const sig = sealed.slice(dot + 1);
+  const expected = createHmac("sha256", secret).update(token).digest("base64url");
+  if (!secretsMatch(sig, expected)) return null;
+  return token;
+}
+
+export function sessionCookieOptions() {
+  const production = process.env.NODE_ENV === "production";
+  return {
+    httpOnly: true as const,
+    secure: production,
+    sameSite: "lax" as const,
+    path: "/",
+    maxAge: 60 * 60 * 24 * SESSION_DAYS,
+  };
+}
 
 export type CurrentUser = {
   id: string;
@@ -40,7 +78,8 @@ export function secretsMatch(provided: string, expected: string): boolean {
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
+  const sealed = jar.get(sessionCookieName())?.value;
+  const token = sealed ? openSession(sealed) : null;
   if (!token) return null;
   const session = await db.session.findUnique({
     where: { tokenHash: hashToken(token) },
