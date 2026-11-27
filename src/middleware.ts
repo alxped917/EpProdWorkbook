@@ -1,11 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = [/^\/login$/, /^\/api\/auth\/login$/, /^\/api\/webhooks\//, /^\/api\/cron\//];
+const PUBLIC_PATHS = [/^\/login$/, /^\/setup$/, /^\/api\/auth\/login$/, /^\/api\/webhooks\//, /^\/api\/cron\//];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (PUBLIC_PATHS.some((pattern) => pattern.test(pathname))) return NextResponse.next();
-  const token = request.cookies.get("ep_session")?.value;
+  const cookieName = process.env.NODE_ENV === "production" ? "__Host-ep_session" : "ep_session";
+  const token = request.cookies.get(cookieName)?.value;
   if (token) return NextResponse.next();
   if (pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

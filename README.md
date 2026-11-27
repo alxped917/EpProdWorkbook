@@ -1,144 +1,101 @@
 # Workbook
 
-Inventory, pick sheets, and job cost for **Endless Poxybilities Concrete Coating**. It replaces the InventorySync subscription the shop is paying for: installers weigh material out of a warehouse for a job, weigh leftovers back in, and the office sees usage, stock, and what the floor cost.
+Inventory, pick sheets, and job cost for Endless Poxybilities Concrete Coating. Installers weigh material out of a warehouse for a job and weigh the leftovers back in.
 
-This repository is public. It ships with fake sample data only. Do not commit `.env`, API keys, real customer exports, or real passwords.
+This GitHub repo is public. Do not put passwords, API keys, or real customer lists in it.
 
-## Stack
+## Put Workbook on the internet
 
-- Next.js (App Router) and React
-- Prisma with SQLite for local development
-- Cookie sessions (password hashed with bcrypt)
-- Tailwind CSS, dark by default, with a light toggle
-- Vitest for pick-sheet math and inventory balances
+These steps are for the owner. You do not need to write code.
 
-The schema uses only portable column types. Production can switch the Prisma provider to PostgreSQL (Vercel + hosted Postgres) without a model rewrite. See [Deploy](#deploy).
+1. Go to [vercel.com](https://vercel.com) and create an account with **Continue with GitHub**. Use the GitHub user that can open `alxped917/EpProdWorkbook`.
+2. Click **Add New… → Project** and import **EpProdWorkbook**. Leave the framework as Next.js. Do not change the build command. The first deploy may fail. That is expected, because the database is not connected yet.
+3. In the Vercel project, open the **Storage** tab (sometimes called **Integrations** or **Marketplace**). Add **Neon**. Connect it to this project and accept the prompts. Vercel fills in `DATABASE_URL` and `DATABASE_URL_UNPOOLED` for you. You do not type those.
+4. Open **Settings → Environment Variables**. Add every row in the table below. Choose **Production** for each one. Skip any row that Neon already created.
+5. Open **Deployments**, open the latest one, and click **Redeploy**. Wait until it says **Ready**.
+6. Open the site link Vercel shows (it ends in `.vercel.app`). You should see **Create the first account**. Type the setup code you saved as `SETUP_SECRET` and click the button.
+7. Sign in with `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
 
-## Setup
+If the page says the database is not ready, the deploy is still running or it failed. Open the failed deploy and read the last lines. The usual fix is a missing variable from the table, then redeploy.
+
+The nightly Builder Prime sync is already scheduled (11:00 UTC). It does nothing useful until you add a Builder Prime API key, and it stays locked behind `CRON_SECRET`.
+
+### Environment variables
+
+Generate three random secrets. On a Mac or Linux computer, open Terminal and run this three times. Each line it prints is one secret. Save them in a password manager. Do not put them in GitHub.
+
+```bash
+openssl rand -base64 32
+```
+
+| Name | What to put | Who sets it |
+| --- | --- | --- |
+| `DATABASE_URL` | Neon’s pooled connection. The host name usually contains `-pooler`. | Neon, automatically |
+| `DATABASE_URL_UNPOOLED` | Neon’s direct connection. The host name does **not** contain `-pooler`. Migrations use this. | Neon, automatically |
+| `DIRECT_URL` | Only if the deploy says `DIRECT_URL` is missing. Paste the same value as `DATABASE_URL_UNPOOLED`. | You, only if the log asks |
+| `AUTH_SECRET` | One of the random strings from the command above. At least 32 characters. Not the example in this file. | You |
+| `CRON_SECRET` | A second random string. Vercel sends it automatically when the nightly sync runs. | You |
+| `SETUP_SECRET` | A third random string. You type this once on the setup page. At least 16 characters. | You |
+| `ADMIN_EMAIL` | The email you will use to sign in. | You |
+| `ADMIN_PASSWORD` | The password you will type to sign in. At least 12 characters. Do not use `demo-pass-7783`. | You |
+| `ADMIN_NAME` | Optional. Your name as it should appear in the app. | You |
+| `BUILDER_PRIME_API_KEY` | Leave blank until Builder Prime shows you a key. Create it in Builder Prime under Admin → Integrations → Open API, with permission `projects.read`. The key is shown only once. | You, later |
+| `BUILDER_PRIME_SUBDOMAIN` | `endlesspoxybilities` | You, optional |
+| `BUILDER_PRIME_WEBHOOK_SECRET` | Another random string, only when you turn on Builder Prime’s webhook. | You, later |
+| `SEED_SAMPLE_DATA` | Leave this off. Set it to `true` only if you want the fake practice jobs in the live database. | You, almost never |
+| `SEED_PASSWORD` | Not used on the live site unless `SEED_SAMPLE_DATA` is `true`. | Leave unset |
+
+Apply the variables to **Production**. If Vercel also builds preview sites and those builds fail, add the same variables to **Preview**.
+
+After setup, change a ship-to address under **Warehouses**. The starter addresses say “Update this ship-to address” on purpose.
+
+If you saved the wrong admin password and you have not given the site to the crew yet: fix `ADMIN_PASSWORD` in Vercel, redeploy, then in the Neon SQL editor run `DELETE FROM "User";` and open `/setup` again.
+
+## Work on it locally
+
+Local development uses the same Postgres database type as Vercel, in Docker.
 
 ```bash
 cp .env.example .env
+# Put a long random AUTH_SECRET in .env. The placeholder is fine only on your computer.
+docker compose up -d
 npm install
-npx prisma db push
+npx prisma migrate deploy
 npm run db:seed
 npm run dev
 ```
 
-Open http://localhost:3000.
+Open http://localhost:3000. Sample sign-in is `avery.quinn@epoxy.example` / `demo-pass-7783` (or whatever you set as `SEED_PASSWORD`). That password is for the fake local users only.
 
-`npm test` runs the pick-sheet and inventory tests. `npm run build` produces the production build.
+`npm test` checks pick-sheet math, inventory balances, and the production seed rules. `npm run build` applies migrations and builds the app, the same command Vercel runs.
 
-### Sample sign-in
+Job **EP-7070** is the 707 sq ft practice job. Lakeville barcodes: `IS-DEMO0001-A001`, `IS-DEMO0002-B001`, `IS-DEMO0003-F001`.
 
-Every sample user shares `SEED_PASSWORD` from `.env`. The default in `.env.example` is `demo-pass-7783`. Change it before any real deployment.
+## What is included
 
-| Person | Email | Role |
-| --- | --- | --- |
-| Avery Quinn | avery.quinn@epoxy.example | Admin, all warehouses |
-| Casey Nguyen | casey.nguyen@epoxy.example | Team lead, North crew |
-| Riley Brooks | riley.brooks@epoxy.example | Team lead, Metro crew |
-| Quinn Alvarez | quinn.alvarez@epoxy.example | Team lead, South crew |
-| Morgan Hale | morgan.hale@epoxy.example | Installer |
-| Reese Patel | reese.patel@epoxy.example | Warehouse, Phoenix |
-| Drew Kim | drew.kim@epoxy.example | Warehouse, Midwest shops |
-| Parker Olsen | parker.olsen@epoxy.example | Office |
-| Samir Cole | samir.cole@epoxy.example | Auditor (custom view-only role) |
+- Roles (Installer, Team Lead, Warehouse, Office, Admin, plus custom roles) and warehouse assignments
+- Six warehouses, chemicals, supplies, flake colors, CSV import, and merge
+- Jobs, pick sheets from editable coverage rates, PDF, check-out / check-in, barcodes, counts, transactions, job cost, calendar, and reports
+- Builder Prime in **mock mode** until `BUILDER_PRIME_API_KEY` is set. Live mode calls `GET https://{subdomain}.builderprime.com/api/projects/v1` with header `x-api-key` (scope `projects.read`). Docs: [Open API](https://help.builderprime.com/bp-knowledgebase/open-api-documentation), [projects](https://help.builderprime.com/bp-knowledgebase/working-with-clients-through-the-api-0), [webhook fields](https://help.builderprime.com/bp-knowledgebase/how-to-integrate-with-review-services).
 
-Warehouses: Phoenix, Sioux Falls, Clarkfield, Lakeville, Cokato, Zimmerman. Addresses are fictional.
+Square footage and flake color are read from Builder Prime custom fields. Rename those fields under Admin → Builder Prime.
 
-### Try the core loop
-
-1. Sign in as Avery.
-2. Open job **EP-7070** (707 sq ft, 1/4 inch Cabin Fever, Lakeville, scheduled today).
-3. Open **Edit pick sheet**. The live quantities should read flake **101 lb**, Base A **26.7**, Base B **13.4**, Top A **34**, Top B **34**. Those rates live in Admin → Coverage rates, not in code.
-4. Open **Check Out / Check In**. Type pounds checked out and checked in. They save on their own. Used = out − in. The first checkout moves a New job to In progress.
-5. Lakeville demo containers you can scan or type: `IS-DEMO0001-A001` (Basecoat A, 48 lb), `IS-DEMO0002-B001` (Basecoat B, 52.5 lb), `IS-DEMO0003-F001` (Cabin Fever, 40 lb).
-6. **Job cost** shows planned vs taken vs returned vs used, dollars, and Over / Under / On target (default tolerance 5%).
-7. **Transactions** and **Inventory → Records** show the balance change. **Count stock** writes an adjustment.
-
-Admin → Builder Prime → **Sync Jobs** imports mock sold projects (EP-3101 and friends) with no API key. EP-3106 is already in the database with a stale address so the sync also shows an update.
-
-## Environment
-
-| Variable | Purpose |
-| --- | --- |
-| `DATABASE_URL` | Local default `file:./dev.db` (path is relative to `prisma/`). |
-| `AUTH_SECRET` | Required in production so a deploy fails closed if the environment was not configured. |
-| `SEED_PASSWORD` | Password the seed script assigns to every sample user. |
-| `BUILDER_PRIME_API_KEY` | Server-only. Leave empty to stay in mock mode. |
-| `BUILDER_PRIME_SUBDOMAIN` | Default `endlesspoxybilities`. The database setting overrides this after you save the admin form. |
-| `BUILDER_PRIME_WEBHOOK_SECRET` | Required before `POST /api/webhooks/builder-prime` accepts anything. |
-| `CRON_SECRET` | Required before `/api/cron/builder-prime` runs the nightly sync. |
-
-## Builder Prime
-
-Public docs used for the client:
-
-- [Open API overview](https://help.builderprime.com/bp-knowledgebase/open-api-documentation) — key is created under Admin → Integrations → Open API and shown once.
-- [Projects API](https://help.builderprime.com/bp-knowledgebase/working-with-clients-through-the-api-0) — `GET/POST https://{subdomain}.builderprime.com/api/projects/v1`, header `x-api-key`, scope `projects.read` to list. Query: `limit` (max 100), `page` (starts at 0), `project-status`, `last-modified-since` (epoch ms, not older than one year).
-- [Employees API](https://help.builderprime.com/bp-knowledgebase/working-with-clients-through-the-api-1-0) — not called yet. Crew matching uses the foreman name on the project.
-- [Webhook field list](https://help.builderprime.com/bp-knowledgebase/how-to-integrate-with-review-services) — project-context payload (`projectId`, `projectNumber`, `projectStatus`, worksite address, `salesPerson`, `foreman`, and so on). Square footage and flake color are read from custom fields. Default names: Square Footage, Flake Color, Flake Size, Verticals, Stairs. Change them under Admin → Builder Prime.
-
-There is no API key in this repo. Mock mode serves `src/lib/bp-fixtures.ts`. Switch the admin page to **Live** only after `BUILDER_PRIME_API_KEY` is set on the server. The key is never sent to the browser.
-
-Nightly sync: `vercel.json` schedules `GET /api/cron/builder-prime` at 11:00 UTC. Vercel sends `Authorization: Bearer $CRON_SECRET`. A manual caller can send `x-cron-secret` instead.
-
-Webhook: point a Builder Prime “Send Webhook” automation (on the sold status) at:
-
-```text
-https://YOUR_HOST/api/webhooks/builder-prime?secret=YOUR_WEBHOOK_SECRET
-```
-
-The secret may also be the `x-webhook-secret` header or a `webhookSecret` field in the JSON body. Builder Prime’s own webhook UI can add extra key/value pairs; it does not sign the body, so the shared secret is the check.
+Webhook, after you set the secret:
 
 ```bash
-curl -X POST "http://localhost:3000/api/webhooks/builder-prime?secret=$BUILDER_PRIME_WEBHOOK_SECRET" \
+curl -X POST "https://YOUR_APP.vercel.app/api/webhooks/builder-prime?secret=$BUILDER_PRIME_WEBHOOK_SECRET" \
   -H "Content-Type: application/json" \
-  -d '{"projectId":"910199","projectNumber":"EP-3199","projectStatus":"Sold","foreman":"Jordan Ellis","salesPerson":"Parker Olsen","worksiteAddressLine1":"5 Fictional Pine Ct","worksiteAddressCity":"Sioux Falls","worksiteAddressState":"SD","worksiteAddressPostalCode":"57104","customFields":[{"customFieldName":"Square Footage","customFieldValue":"640"},{"customFieldName":"Flake Color","customFieldValue":"Creekbed"}]}'
+  -d '{"projectId":"910199","projectNumber":"EP-3199","projectStatus":"Sold"}'
 ```
 
-A job is assigned to a crew when the foreman name matches that crew’s lead or a member.
+## Not emailed yet
 
-## What the app covers
+Low-stock notes, sync reports, and purchase orders are stored in the app and are not sent. CompanyCam is a link you paste on a job.
 
-Roles (Installer, Team Lead, Warehouse, Office, Admin, plus custom roles) with per-section none/view/edit. Users can see every warehouse or a subset.
+## Deploy notes for a developer
 
-Warehouses have a ship-to address and a location manager. Master data covers chemicals, supplies, and flake colors, with CSV import, search, and merge. Seeded products include Basecoat A/B at $4.10/lb (48 lb and 52.5 lb boxes), Topcoat A/B at $60/lb, Mender, Tracbite, Crack Fill, and the 1/4 inch colors at $2.00/lb in 40 lb boxes. Prices that the shop did not specify are tagged “sample price”.
-
-Jobs have number, Builder Prime id, type, status, address, salesperson, foreman, warehouse, dates, square footage, flake color and size, and “needs a look” flags. Lists filter and export CSV. Archive and delete are soft.
-
-The pick sheet uses admin-edited coverage rates (floor, verticals, stairs, season, location). Optional lines: moisture barrier, Gator/Shark Bite (mapped to Tracbite), Base C/D, Top C/D. Mender is weigh-only. Each line maps to a stocked product, shows about N boxes, and warns when nothing is on hand. PDF download is on the job.
-
-Inventory is a weight balance per product per warehouse, plus barcoded containers (`IS-XXXXXXXX-XXXX`) with printable labels. Count stock saves each change as an adjustment.
-
-Transactions record time, barcode, product, event (DRAWN, RETURNED, ADJUSTED, TRASHED, RECEIVED), signed weight change, new balance, warehouse, job, and user. The event activity log records who changed jobs, stock, products, and settings.
-
-Dashboard counts and the production calendar (day/week/month, filter by warehouse, status, color, square feet) use the scheduled date.
-
-Reporting covers stock health, upcoming pick-sheet demand versus on hand, shelf-minimum ordering, usage, material still checked out, and crew variance against the plan.
-
-## Stubbed on purpose
-
-- **Email.** Low stock, sync reports, and purchase orders are written to an outbox (`Admin → Purchasing`) with status `SKIPPED_NO_SMTP`. Nothing is emailed.
-- **Reorder automation** generates a draft PO from reorder points and shelf minimums. It does not send it.
-- **CompanyCam** is a link stored on the job, not an API sync.
-- **Live Builder Prime** is implemented (list, map, upsert, webhook, cron) but stays in mock mode until a key exists. Employee directory sync is not built.
-- **Measure sheets** are not a separate Builder Prime endpoint in the public docs. Square footage is read from custom fields, which you can rename in settings.
-
-## Deploy
-
-1. Create a Postgres database and set `DATABASE_URL` to its pooled URL.
-2. In `prisma/schema.prisma`, change `provider = "sqlite"` to `provider = "postgresql"`.
-3. Run `npx prisma db push` (or generate a SQL migration with `npx prisma migrate diff`) against that database, then `npm run db:seed` once for sample data. Skip the seed on a database that already has real jobs.
-4. Set `AUTH_SECRET`, `CRON_SECRET`, and `BUILDER_PRIME_WEBHOOK_SECRET` to long random strings. Leave `BUILDER_PRIME_API_KEY` empty until the shop generates one (`projects.read`).
-5. Deploy the Next.js app (Vercel works). The cron in `vercel.json` calls the sync route daily. Confirm Vercel’s cron invocation is allowed to send `Authorization: Bearer $CRON_SECRET`.
-
-Replace the sample passwords and remove or deactivate the `@epoxy.example` users before the team uses it with real jobs.
-
-## Tests
-
-```bash
-npm test
-```
-
-`tests/pick-sheet.test.ts` locks the 707 sq ft / 1/4 inch reference and checks that rates, season, location, and optional components come from the coverage config. `tests/inventory.test.ts` checks draw, return, corrections, counts, trash, receive, and the first-checkout status rule.
+- Schema provider is `postgresql` in local and production. `DATABASE_URL` is the runtime (pooled) URL. `DIRECT_URL` is the direct URL Prisma uses for `prisma migrate deploy`.
+- `scripts/vercel-build.mjs` copies `DATABASE_URL_UNPOOLED` or `POSTGRES_URL_NON_POOLING` into `DIRECT_URL` when Neon used a different name, then runs `prisma generate`, `prisma migrate deploy`, and `next build`.
+- The Prisma client is cached on `globalThis` and, on Vercel or a `-pooler` host, adds `connection_limit=1` and `pgbouncer=true`.
+- Sessions are httpOnly, `SameSite=Lax`, and `Secure` in production. The cookie name is `__Host-ep_session`. The value is an HMAC using `AUTH_SECRET`. The build fails on Vercel if `AUTH_SECRET` or `CRON_SECRET` is missing or still a placeholder.
+- Nothing in the app writes to the local disk. PDFs and labels are built in memory.

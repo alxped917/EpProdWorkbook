@@ -9,12 +9,13 @@ import { matchCrew } from "../src/lib/crew";
 import { jobSearchText, nameKey } from "../src/lib/names";
 import { addDaysISO, todayISO } from "../src/lib/dates";
 import { round2 } from "../src/lib/format";
+import { ensureAdmin, seedCore } from "../src/lib/seed-core";
+import { resolveSeedPlan } from "../src/lib/seed-plan";
 
 const prisma = new PrismaClient();
-const password = process.env.SEED_PASSWORD || "demo-pass-7783";
 const today = todayISO("America/Chicago");
 
-async function main() {
+async function seedSample(password: string) {
   const reference = calculatePickSheet(
     {
       squareFeet: 707,
@@ -506,8 +507,32 @@ async function main() {
     },
   });
 
-  console.log(`Seeded Workbook. Sign in as avery.quinn@epoxy.example with the SEED_PASSWORD (default ${password}).`);
+  console.log(`Seeded sample data. Sign in as avery.quinn@epoxy.example with password ${password}.`);
   console.log("Demo job EP-7070 is 707 sq ft at Lakeville. Scan IS-DEMO0001-A001, IS-DEMO0002-B001, or IS-DEMO0003-F001.");
+}
+
+async function main() {
+  const plan = resolveSeedPlan(process.env);
+  if (!plan.ok) throw new Error(plan.error);
+  if (!plan.production) {
+    if (!plan.sample) {
+      await seedCore(prisma);
+      console.log("Seeded master data only (SEED_SAMPLE_DATA=false).");
+      return;
+    }
+    await seedSample(plan.samplePassword);
+    return;
+  }
+  const users = await prisma.user.count();
+  const jobs = await prisma.job.count();
+  if (plan.sample && users === 0 && jobs === 0) {
+    await seedSample(plan.samplePassword);
+  } else {
+    await seedCore(prisma);
+  }
+  const admin = await ensureAdmin(prisma, plan);
+  console.log(admin.created ? `Created admin ${admin.email}` : `Admin ${admin.email} already exists. Password was left unchanged.`);
+  if (!plan.sample) console.log("Sample jobs were not loaded. Set SEED_SAMPLE_DATA=true before the first setup if you want them.");
 }
 
 main()

@@ -6,10 +6,13 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import {
-  SESSION_COOKIE,
   getCurrentUser,
   hashToken,
   newSessionToken,
+  openSession,
+  sealSession,
+  sessionCookieName,
+  sessionCookieOptions,
   sessionExpiry,
 } from "@/lib/auth";
 import { homePath, normalizePermissions } from "@/lib/permissions";
@@ -34,13 +37,7 @@ export async function login(formData: FormData): Promise<{ error: string } | voi
     data: { userId: user.id, tokenHash: hashToken(token), expiresAt: sessionExpiry() },
   });
   const jar = await cookies();
-  jar.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 14,
-  });
+  jar.set(sessionCookieName(), sealSession(token), sessionCookieOptions());
   await writeAudit({
     userId: user.id,
     userName: user.name,
@@ -62,9 +59,10 @@ export async function login(formData: FormData): Promise<{ error: string } | voi
 export async function logout() {
   const user = await getCurrentUser();
   const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
+  const sealed = jar.get(sessionCookieName())?.value;
+  const token = sealed ? openSession(sealed) : null;
   if (token) await db.session.deleteMany({ where: { tokenHash: hashToken(token) } });
-  jar.delete(SESSION_COOKIE);
+  jar.delete(sessionCookieName());
   if (user) {
     await writeAudit({
       userId: user.id,

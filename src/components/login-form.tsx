@@ -10,10 +10,10 @@ const samples = [
   ["Warehouse", "reese.patel@epoxy.example"],
 ];
 
-export function LoginForm({ next, passwordHint }: { next?: string; passwordHint: string }) {
+export function LoginForm({ next, passwordHint, showSamples = false }: { next?: string; passwordHint: string; showSamples?: boolean }) {
   const [error, setError] = useState("");
-  const [email, setEmail] = useState("avery.quinn@epoxy.example");
-  const [password, setPassword] = useState(passwordHint);
+  const [email, setEmail] = useState(showSamples ? "avery.quinn@epoxy.example" : "");
+  const [password, setPassword] = useState(showSamples ? passwordHint : "");
 
   async function onSubmit(formData: FormData) {
     const result = await login(formData);
@@ -33,13 +33,15 @@ export function LoginForm({ next, passwordHint }: { next?: string; passwordHint:
       </label>
       {error ? <p className="text-sm text-danger">{error}</p> : null}
       <button className="min-h-11 w-full rounded-xl bg-accent font-medium text-accent-ink" type="submit">Sign in</button>
-      <div className="flex flex-wrap gap-2">
-        {samples.map(([label, value]) => (
-          <button key={value} className="rounded-full border border-line px-3 py-1 text-xs" type="button" onClick={() => { setEmail(value); setPassword(passwordHint); }}>
-            {label}
-          </button>
-        ))}
-      </div>
+      {showSamples ? (
+        <div className="flex flex-wrap gap-2">
+          {samples.map(([label, value]) => (
+            <button key={value} className="rounded-full border border-line px-3 py-1 text-xs" type="button" onClick={() => { setEmail(value); setPassword(passwordHint); }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </form>
   );
 }

@@ -37,7 +37,7 @@ export async function getWorkspace(): Promise<Workspace> {
     coverage: normalizeCoverage(objectOr(row.coverageJson, {})),
     componentMap: objectOr(row.componentMapJson, {}),
     bpSubdomain: row.bpSubdomain || process.env.BUILDER_PRIME_SUBDOMAIN || "endlesspoxybilities",
-    bpMode: row.bpMode === "live" ? "live" : "mock",
+    bpMode: row.bpMode === "live" && process.env.BUILDER_PRIME_API_KEY?.trim() ? "live" : "mock",
     importStatuses: row.bpImportStatuses.split(",").map((s) => s.trim()).filter(Boolean),
     fieldMap: {
       squareFootage: parsedFields.squareFootage?.length ? parsedFields.squareFootage : fieldDefaults.squareFootage,
