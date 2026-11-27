@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f3efe6;
+  --bg-elev: #fffdf8;
+  --bg-muted: #e7e0d2;
+  --text: #1c1915;
+  --text-muted: #5e584e;
+  --border: #ddd4c3;
+  --accent: #b45309;
+  --accent-contrast: #fffaf3;
+  --danger: #b42318;
+  --ok: #067647;
+  --sidebar: #221e19;
+  --sidebar-text: #f6f1e7;
+  --sidebar-muted: #cbbfaa;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #12110e;
+  --bg-elev: #1c1a16;
+  --bg-muted: #2a261f;
+  --text: #f6f1e7;
+  --text-muted: #b7ad9e;
+  --border: #3a342c;
+  --accent: #f5b042;
+  --accent-contrast: #1c1406;
+  --danger: #f97066;
+  --ok: #3dce9a;
+  --sidebar: #0e0d0b;
+  --sidebar-text: #f6f1e7;
+  --sidebar-muted: #b7ad9e;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-canvas: var(--bg);
+  --color-panel: var(--bg-elev);
+  --color-sunken: var(--bg-muted);
+  --color-ink: var(--text);
+  --color-muted: var(--text-muted);
+  --color-line: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-contrast);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-ink: var(--sidebar-text);
+  --color-sidebar-muted: var(--sidebar-muted);
+}
+
+* { box-sizing: border-box; }
+
+html, body { min-height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Avenir Next", "Segoe UI", "Liberation Sans", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+
+input, select, textarea { font: inherit; color: inherit; }
+
+table { border-collapse: collapse; }
